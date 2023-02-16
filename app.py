@@ -1,5 +1,4 @@
 from flask import Flask, request
-import json
 from flask_jsonpify import jsonpify
 import psycopg2
 from flask_restful import Resource, Api
@@ -10,23 +9,15 @@ from flask_apispec.extension import FlaskApiSpec
 from flask_apispec.views import MethodResource
 from flask_apispec import marshal_with, doc, use_kwargs
 from TextPreprocess import TextPreprocess
-# from googletrans import Translator
 import os
 import pandas as pd
 import numpy as np
-# import sqlalchemy as db
 from gensim import models
 from gensim.matutils import cossim
 import pickle
 from threading import Thread
 import warnings
 warnings.filterwarnings("ignore")
-# import nltk
-# nltk.download('wordnet')
-# nltk.download('omw-1.4')
-# nltk.download('stopwords')
-# from nltk.tokenize import RegexpTokenizer
-# from nltk.stem.wordnet import WordNetLemmatizer
 NUMBER_OF_TOPICS = 10
 
 # custom thread
@@ -112,8 +103,6 @@ def get_db_connection():
                             password='F*JL(oL<$p%.bM{i')
     return conn
 # Load Source Data
-# content = fetch_table("content")
-# reference = fetch_table("reference")
 content = pd.DataFrame(fetch_table("content"), columns=['id', 'Source', 'Category', 'Title', 'Keyword', 'Subtitle', 'Authors',
        'Content', 'PublishDate', 'Hyperlink', 'NoOfView'])
 reference = pd.DataFrame(fetch_table("reference"),columns=['RefID', 'hyperlink', 'SourceContentID', 'ReferenceContentID'])
@@ -174,11 +163,9 @@ class Search(MethodResource, Resource):
     @use_kwargs(SearchRequestSchema, location=('json'))
     @marshal_with(SearchResponseSchema)  # marshalling
     def post(self, **kwargs):
-        # starttime = time.perf_counter()
         p = content
         input_docs = request.get_json()['text']
         combine_input = id2wordfile.doc2bow(input_docs.lower().split())
-        # text_input, combine_input = fitPreprocess(input_docs, id2wordfile)
         topical_input = lda.get_document_topics(combine_input)
         topical_thread = TopicalThread(topical_input)
         textual_thread = TextualThread(input_docs)
@@ -193,16 +180,8 @@ class Search(MethodResource, Resource):
         topical_thread.join()
         p['textual_sim'] = textual_thread.value
         p['sum'] = p['topical_sim'] * LogRegModel.coef_[0, 0] + p['textual_sim'] * LogRegModel.coef_[0, 1] + p['CrowdRank'] * LogRegModel.coef_[0, 1]
-        # print(time.perf_counter()-starttime)
         p = p.sort_values('sum', ascending=False)
         return jsonpify(p.to_dict(orient="records"))
-            
-        '''
-        Get method represents a GET API method
-        '''
-        # return {'message': 'My First API'}
-        # print(pd.DataFrame(content).to_json())
-        # return pd.DataFrame(content).to_json(orient="records")
     
 # class Translation(MethodResource, Resource):
 #     @doc(description='Translation.', tags=['Translation'])
