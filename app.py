@@ -9,7 +9,6 @@ from flask_apispec.extension import FlaskApiSpec
 from flask_apispec.views import MethodResource
 from flask_apispec import marshal_with, doc, use_kwargs
 from TextPreprocess import TextPreprocess
-import os
 import pandas as pd
 import numpy as np
 from gensim import models
@@ -20,20 +19,23 @@ import warnings
 warnings.filterwarnings("ignore")
 NUMBER_OF_TOPICS = 10
 
-# custom thread
+# custom thread for computation of topical similarity
 class TopicalThread(Thread):
     # constructor
-    def __init__(self,topical_input):
+    def __init__(self,input_docs):
         # execute the base constructor
         Thread.__init__(self)
-        self.topical_input = topical_input
+        self.input_docs = input_docs
         # set a default value
         self.value = None
     # function executed in a new thread
     def run(self):
-        topical_sim = [cossim(self.topical_input, doci) for doci in topical_docs]
+        combine_input = id2wordfile.doc2bow(self.input_docs.lower().split())
+        topical_input = lda.get_document_topics(combine_input)
+        topical_sim = [cossim(topical_input, doci) for doci in topical_docs]
         self.value = topical_sim
 
+# custom thread for computation of textual similarity
 class TextualThread(Thread):
     # constructor
     def __init__(self,text_input):
@@ -55,6 +57,7 @@ class TextualThread(Thread):
             textual_sim.append(cossim(origin_df[[column]].loc[origin_df[column] != 0].to_records(), input_vec))
         self.value = textual_sim
 
+# custom thread for computation of CrowdRank
 class CrowdRankThread(Thread):
     # constructor
     def __init__(self,papers):
@@ -86,7 +89,7 @@ class CrowdRankThread(Thread):
         p['CrowdRank'] = (p['CrowdRank'] - p['CrowdRank'].min()) / (p['CrowdRank'].max() - p['CrowdRank'].min())
         self.value = p
 
-
+# Fetch table from Database
 def fetch_table(table_name):
     conn = get_db_connection()
     cur = conn.cursor()
@@ -96,6 +99,7 @@ def fetch_table(table_name):
     conn.close()
     return table
 
+# Build Database Connection
 def get_db_connection():
     conn = psycopg2.connect(host='34.168.68.153',
                             database='postgres',
@@ -106,6 +110,7 @@ def get_db_connection():
 content = pd.DataFrame(fetch_table("content"), columns=['id', 'Source', 'Category', 'Title', 'Keyword', 'Subtitle', 'Authors',
        'Content', 'PublishDate', 'Hyperlink', 'NoOfView'])
 reference = pd.DataFrame(fetch_table("reference"),columns=['RefID', 'hyperlink', 'SourceContentID', 'ReferenceContentID'])
+
 # Load LDA Model
 lda = models.ldamodel.LdaModel.load('Model/lda_model')
 texts, id2word, corpus = TextPreprocess(pd.DataFrame(content))
@@ -114,13 +119,16 @@ combine_docs = []
 for idx in range(len(texts)):
     combine_docs.append(' '.join(map(str, texts[idx])))
 
+# Load TF-IDF Model
 vectorizer = pickle.load(open("Model/vectorizer.pickle", "rb"))
 origin_tfidf = vectorizer.transform(combine_docs)
 origin_df = pd.DataFrame(origin_tfidf.T.todense(), index=vectorizer.get_feature_names_out()).reset_index()
 origin_df.drop(columns=['index'], inplace=True)
 
+# Load T-TIF Model
 LogRegModel = pickle.load(open("Model/LogRegModel.sav", 'rb'))
 
+# Load Dictionary Data
 id2wordfile = pickle.load(open('Model/id2word.sav', 'rb'))
 
 app = Flask(__name__)  # Flask app instance initiated
@@ -137,7 +145,7 @@ app.config.update({
 })
 docs = FlaskApiSpec(app)
 
-
+# Schema Design
 class SearchResponseSchema(Schema):
     message = fields.Str(dump_default='Success',
                          metadata={'description': 'Return Example'})
@@ -164,12 +172,10 @@ class Search(MethodResource, Resource):
     @marshal_with(SearchResponseSchema)  # marshalling
     def post(self, **kwargs):
         p = content
-        input_docs = request.get_json()['text']
-        combine_input = id2wordfile.doc2bow(input_docs.lower().split())
-        topical_input = lda.get_document_topics(combine_input)
-        topical_thread = TopicalThread(topical_input)
+        input_docs = request.get_json()['text']  # Get input text
         textual_thread = TextualThread(input_docs)
         textual_thread.start()
+        topical_thread = TopicalThread(input_docs)
         topical_thread.start()
         textual_thread.join()
         p['topical_sim'] = topical_thread.value
