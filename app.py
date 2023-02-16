@@ -194,10 +194,8 @@ class Search(MethodResource, Resource):
         p['textual_sim'] = textual_thread.value
         p['sum'] = p['topical_sim'] * LogRegModel.coef_[0, 0] + p['textual_sim'] * LogRegModel.coef_[0, 1] + p['CrowdRank'] * LogRegModel.coef_[0, 1]
         # print(time.perf_counter()-starttime)
-        p = p.sort_values('sum', ascending=False).head(2)
-        json_records = p.to_json(orient ='records')
-        print(json_records)
-        return {'result': json_records}
+        p = p.sort_values('sum', ascending=False)
+        return jsonpify(p.to_dict(orient="records"))
             
         '''
         Get method represents a GET API method
