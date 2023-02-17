@@ -1,4 +1,4 @@
-from flask import Flask, request
+from flask import Flask, request, render_template
 from flask_jsonpify import jsonpify
 import psycopg2
 from flask_restful import Resource, Api
@@ -13,6 +13,8 @@ import pandas as pd
 import numpy as np
 from gensim import models
 from gensim.matutils import cossim
+import pyLDAvis
+import pyLDAvis.gensim_models as gensimvis
 import pickle
 from threading import Thread
 import warnings
@@ -131,6 +133,9 @@ LogRegModel = pickle.load(open("Model/LogRegModel.sav", 'rb'))
 # Load Dictionary Data
 id2wordfile = pickle.load(open('Model/id2word.sav', 'rb'))
 
+vis = pyLDAvis.gensim_models.prepare(lda, corpus, id2word)
+pyLDAvis.save_html(vis, 'templates/pyLDAvis.html')
+
 app = Flask(__name__)  # Flask app instance initiated
 api = Api(app)  # Flask restful wraps Flask app around it.
 app.config.update({
@@ -155,9 +160,9 @@ class SearchRequestSchema(Schema):
         required=True,
         metadata={'description': 'API type of awesome API'})
     
-# class TranslationResponseSchema(Schema):
-#     message = fields.Str(dump_default='Success',
-#                          metadata={'description': 'Translation Result'})
+class pyLDAvisResponseSchema(Schema):
+    message = fields.Str(dump_default='Success',
+                         metadata={'description': 'Translation Result'})
 
 # class TranslationRequestSchema(Schema):
 #     text = fields.String(
@@ -189,18 +194,17 @@ class Search(MethodResource, Resource):
         p = p.sort_values('sum', ascending=False)
         return jsonpify(p.to_dict(orient="records"))
     
-# class Translation(MethodResource, Resource):
-#     @doc(description='Translation.', tags=['Translation'])
-#     @use_kwargs(TranslationRequestSchema, location=('json'))
-#     @marshal_with(TranslationResponseSchema)  # marshalling
-#     def post(self, **kwargs):
-#         translator = Translator()
-#         return {'message': translator.translate(request.get_json()['text'], src='zh-cn', dest='en').text}
+class pyLDAvisDashboard(MethodResource, Resource):
+    @doc(description='pyLDAvisDashboard.', tags=['Translation'])
+    # @use_kwargs(TranslationRequestSchema, location=('json'))
+    @marshal_with(pyLDAvisResponseSchema)  # marshalling
+    def get(self, **kwargs):
+        return render_template("pyLDAvis.html")
 
 api.add_resource(Search, '/Search')
 docs.register(Search)
-# api.add_resource(Translation, '/Translation')
-# docs.register(Translation)
+api.add_resource(pyLDAvisDashboard, '/pyLDAvisDashboard')
+docs.register(pyLDAvisDashboard)
 
 if __name__ == '__main__':
     app.run(debug=True)
