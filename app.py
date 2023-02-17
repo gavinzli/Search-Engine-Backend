@@ -213,11 +213,10 @@ class pyLDAvisDashboard(MethodResource, Resource):
                                "pyLDAvis.html", as_attachment=True)
     
 class TopicProb(MethodResource, Resource):
-    @doc(description='Search Result.', tags=['Search'])
+    @doc(description='Topic Prediction', tags=['Topic'])
     @use_kwargs(TopicProbRequestSchema, location=('json'))
     @marshal_with(TopicProbResponseSchema)  # marshalling
     def post(self, **kwargs):
-        p = content
         input_docs = request.get_json()['text']  # Get input text
         combine_input = id2wordfile.doc2bow(input_docs.lower().split())
         to_pro = []
