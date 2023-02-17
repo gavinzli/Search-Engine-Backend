@@ -165,6 +165,15 @@ class pyLDAvisResponseSchema(Schema):
     message = fields.Str(dump_default='Success',
                          metadata={'description': 'Translation Result'})
 
+class TopicProbResponseSchema(Schema):
+    message = fields.Str(dump_default='Success',
+                         metadata={'description': 'Return Example'})
+
+class TopicProbRequestSchema(Schema):
+    text = fields.String(
+        required=True,
+        metadata={'description': 'API type of awesome API'})
+
 # class TranslationRequestSchema(Schema):
 #     text = fields.String(
 #         required=True,
@@ -202,11 +211,28 @@ class pyLDAvisDashboard(MethodResource, Resource):
     def get(self, **kwargs):
         return send_from_directory("templates",
                                "pyLDAvis.html", as_attachment=True)
+    
+class TopicProb(MethodResource, Resource):
+    @doc(description='Search Result.', tags=['Search'])
+    @use_kwargs(TopicProbRequestSchema, location=('json'))
+    @marshal_with(TopicProbResponseSchema)  # marshalling
+    def post(self, **kwargs):
+        p = content
+        input_docs = request.get_json()['text']  # Get input text
+        combine_input = id2wordfile.doc2bow(input_docs.lower().split())
+        to_pro = []
+        vector = lda.get_document_topics(combine_input, minimum_probability=0)
+        for t in vector:
+            to_pro.append(t)
+        Prob = pd.DataFrame(to_pro,columns=['Topic','Probability'])
+        return jsonpify(Prob.to_dict(orient="records"))
 
 api.add_resource(Search, '/Search')
 docs.register(Search)
 api.add_resource(pyLDAvisDashboard, '/pyLDAvisDashboard')
 docs.register(pyLDAvisDashboard)
+api.add_resource(TopicProb, '/TopicProb')
+docs.register(TopicProb)
 
 if __name__ == '__main__':
     app.run(debug=True)
