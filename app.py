@@ -1,4 +1,4 @@
-from flask import Flask, request, render_template
+from flask import Flask, request, send_from_directory
 from flask_jsonpify import jsonpify
 import psycopg2
 from flask_restful import Resource, Api
@@ -108,6 +108,7 @@ def get_db_connection():
                             user='vm',
                             password='F*JL(oL<$p%.bM{i')
     return conn
+
 # Load Source Data
 content = pd.DataFrame(fetch_table("content"), columns=['id', 'Source', 'Category', 'Title', 'Keyword', 'Subtitle', 'Authors',
        'Content', 'PublishDate', 'Hyperlink', 'NoOfView'])
@@ -197,9 +198,10 @@ class Search(MethodResource, Resource):
 class pyLDAvisDashboard(MethodResource, Resource):
     @doc(description='pyLDAvisDashboard.', tags=['Translation'])
     # @use_kwargs(TranslationRequestSchema, location=('json'))
-    @marshal_with(pyLDAvisResponseSchema)  # marshalling
+    # @marshal_with(pyLDAvisResponseSchema)  # marshalling
     def get(self, **kwargs):
-        return render_template("pyLDAvis.html")
+        return send_from_directory("templates",
+                               "pyLDAvis.html", as_attachment=True)
 
 api.add_resource(Search, '/Search')
 docs.register(Search)
